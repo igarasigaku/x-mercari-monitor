@@ -84,22 +84,49 @@ def send_item(tweet, parent, url):
     webhook = WEBHOOKS.get(author)
     if not webhook:
         raise RuntimeError(f'Missing webhook for {author}')
+
     p = urlsplit(url)
-    pairs = [(k, v) for k, v in parse_qsl(p.query, keep_blank_values=True) if k != 'afid']
+    pairs = [(k, v) for k, v in parse_qsl(
+        p.query, keep_blank_values=True) if k != 'afid']
     pairs.insert(0, ('afid', AFID))
-    affiliate = urlunsplit((p.scheme, p.netloc, p.path, urlencode(pairs), p.fragment))
-    intent = 'https://twitter.com/intent/tweet?' + urlencode({'text': affiliate, 'in_reply_to': parent})
-    message = ('@everyone\n━━━━━━━━━━━━━━━━━━━━\nメルカリリンクを検出！\n\n'
-               f'監視対象: @{tweet["_author_username"]}\n\n'
-               f'元ツイート\nhttps://x.com/i/status/{parent}\n\n'
-               f'Xで返信する\n{intent}\n━━━━━━━━━━━━━━━━━━━━')
+
+    affiliate = urlunsplit((
+        p.scheme, p.netloc, p.path,
+        urlencode(pairs), p.fragment
+    ))
+
+    intent = 'https://twitter.com/intent/tweet?' + urlencode({
+        'text': affiliate,
+        'in_reply_to': parent
+    })
+
+    embed = {
+        'author': {
+            'name': f'メルカリ監視BOT | @{tweet["_author_username"]}'
+        },
+        'title': '🔔 メルカリリンクを検出！',
+        'color': 3447003,
+        'fields': [
+            {
+                'name': '📌 元ツイート',
+                'value': f'[元ツイートを開く](https://x.com/i/status/{parent})',
+                'inline': False
+            },
+            {
+                'name': '🔗 Xで返信する',
+                'value': f'[返信画面を開く]({intent})',
+                'inline': False
+            }
+        ]
+    }
+
     response = requests.post(webhook, json={
-        'content': message,
-        'allowed_mentions': {'parse': ['everyone']},
+        'content': '@everyone',
+        'embeds': [embed],
+        'allowed_mentions': {'parse': ['everyone']}
     }, timeout=20)
+
     response.raise_for_status()
-
-
 def fetch_recent(state):
     params = {
         'query': QUERY, 'tweet.fields': 'referenced_tweets,entities,author_id',
